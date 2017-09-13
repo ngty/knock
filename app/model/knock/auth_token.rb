@@ -7,14 +7,22 @@ module Knock
 
     def initialize payload: {}, token: nil, verify_options: {}
       if token.present?
-        @payload, _ = JWT.decode token.to_s, decode_key, true, options.merge(verify_options)
-        @token = token
+        decode_token token, verify_options
       else
-        @payload = claims.merge(payload)
-        @token = JWT.encode @payload,
-          secret_key,
-          Knock.token_signature_algorithm
+        encode_token payload, token
       end
+    end
+
+    def decode_token(token, verify_options)
+      @payload, _ = JWT.decode token.to_s, decode_key, true, options.merge(verify_options)
+      @token = token
+    end
+
+    def encode_token(payload, token)
+      @payload = claims.merge(payload)
+      @token = JWT.encode @payload,
+        secret_key,
+        Knock.token_signature_algorithm
     end
 
     def entity_for entity_class
