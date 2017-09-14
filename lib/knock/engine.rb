@@ -4,7 +4,7 @@ module Knock
     if ::Rails.const_defined? 'Generators'
       config.eager_load_paths += Dir["#{config.root}/lib/**/"]
     else
-      require_relative './authenticable'
+      Dir["#{config.root}/lib/knock/**/*.rb"].each{|f| require f }
     end
 
     isolate_namespace Knock
