@@ -5,6 +5,8 @@ module Knock
     attr_reader :token
     attr_reader :payload
 
+    InvalidClientKeyError = Class.new(ArgumentError)
+
     def initialize payload: {}, token: nil, verify_options: {}
       if token.present?
         decode_token token, verify_options
@@ -34,7 +36,7 @@ module Knock
       @payload = claims.merge(payload)
       @token = JWT.encode @payload,
         secret_key,
-        Knock.token_signature_algorithm
+        token_signature_algorithm
     end
 
     def entity_for entity_class
@@ -50,25 +52,67 @@ module Knock
     end
 
   private
-    def secret_key
-      Knock.token_secret_signature_key.call
+
+    def secret_key(client_key = 0)
+      return unless keys = secret_keys
+      keys[client_key] or raise InvalidClientKeyError
     end
 
-    def decode_keys
-      case key_or_keys = Knock.token_public_key || secret_key
+    def secret_keys
+      key_or_keys = Knock.token_secret_signature_key
+      key_or_keys = key_or_keys.call if key_or_keys.respond_to? :call
+
+      case key_or_keys
       when Hash
         key_or_keys
       when Array
         Hash[key_or_keys.map.with_index{|key, i| [i, key] }]
       else
-        {0 => key_or_keys}
+        { 0 => key_or_keys } unless key_or_keys.blank?
       end
+    end
+
+    def public_keys
+      key_or_keys = Knock.token_public_key
+      key_or_keys = key_or_keys.call if key_or_keys.respond_to? :call
+
+      case key_or_keys
+      when Hash
+        key_or_keys
+      when Array
+        Hash[key_or_keys.map.with_index{|key, i| [i, key] }]
+      else
+        { 0 => key_or_keys } unless key_or_keys.blank?
+      end
+    end
+
+    def decode_keys
+      (secret_keys || {}).merge(public_keys || {})
     end
 
     def options(client_key)
       verify_claims(client_key).merge({
-        algorithm: Knock.token_signature_algorithm
+        algorithm: token_signature_algorithm(client_key)
       })
+    end
+
+    def token_signature_algorithm(client_key = 0)
+      return unless algos = token_signature_algorithms
+      algos[client_key] or raise InvalidClientKeyError
+    end
+
+    def token_signature_algorithms
+      algo_or_algos = Knock.token_signature_algorithm
+      algo_or_algos = algo_or_algos.call if algo_or_algos.respond_to? :call
+
+      case algo_or_algos
+      when Hash
+        algo_or_algos
+      when Array
+        Hash[algo_or_algos.map.with_index{|algo, i| [i, algo] }]
+      else
+        { 0 => algo_or_algos } unless algo_or_algos.blank?
+      end 
     end
 
     def claims
@@ -96,24 +140,25 @@ module Knock
 
     def token_audience(client_key = 0)
       return unless auds = token_audiences
-
-      auds[client_key] ||
-        case auds
-        when Hash then
-          (auds.to_a[client_key] || [])[1]
-        end
+      auds[client_key] or raise InvalidClientKeyError
     end
 
     def token_audiences
-      verify_audience? &&
-        case aud_or_auds = Knock.token_audience.call
-        when Array, Hash then aud_or_auds
-        else [aud_or_auds]
-        end
+      aud_or_auds = Knock.token_audience
+      aud_or_auds = aud_or_auds.call if aud_or_auds.respond_to? :call
+
+      case aud_or_auds
+      when Hash
+        aud_or_auds
+      when Array
+        Hash[aud_or_auds.map.with_index{|aud, i| [i, aud] }]
+      else
+        { 0 => aud_or_auds } unless aud_or_auds.blank?
+      end
     end
 
     def verify_audience?
-      Knock.token_audience.present?
+      token_audiences.present?
     end
   end
 end
