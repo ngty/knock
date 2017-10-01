@@ -18,9 +18,9 @@ module Knock
     def decode_token(token, verify_options)
       payload, error = nil
 
-      decode_keys.each do |(client_key, decode_key)|
+      decode_keys.each do |(client, decode_key)|
         begin
-          opts = options(client_key).merge(verify_options)
+          opts = options(client).merge(verify_options)
           payload, _ = JWT.decode token.to_s, decode_key, true, opts
           break
         rescue => err
@@ -53,9 +53,9 @@ module Knock
 
   private
 
-    def secret_key(client_key = 0)
+  def secret_key(client = Knock.default_client)
       return unless keys = secret_keys
-      keys[client_key] or raise InvalidClientKeyError
+      keys[client] or raise InvalidClientKeyError
     end
 
     def secret_keys
@@ -90,15 +90,15 @@ module Knock
       (secret_keys || {}).merge(public_keys || {})
     end
 
-    def options(client_key)
-      verify_claims(client_key).merge({
-        algorithm: token_signature_algorithm(client_key)
+    def options(client)
+      verify_claims(client).merge({
+        algorithm: token_signature_algorithm(client)
       })
     end
 
-    def token_signature_algorithm(client_key = 0)
+    def token_signature_algorithm(client = Knock.default_client)
       return unless algos = token_signature_algorithms
-      algos[client_key] or raise InvalidClientKeyError
+      algos[client] or raise InvalidClientKeyError
     end
 
     def token_signature_algorithms
@@ -130,17 +130,17 @@ module Knock
       !Knock.token_lifetime.nil?
     end
 
-    def verify_claims(client_key)
+    def verify_claims(client)
       {
-        aud: token_audience(client_key),
+        aud: token_audience(client),
         verify_aud: verify_audience?,
         verify_expiration: verify_lifetime?
       }
     end
 
-    def token_audience(client_key = 0)
+    def token_audience(client = Knock.default_client)
       return unless auds = token_audiences
-      auds[client_key] or raise InvalidClientKeyError
+      auds[client] or raise InvalidClientKeyError
     end
 
     def token_audiences

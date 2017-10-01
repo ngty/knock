@@ -16,6 +16,9 @@ module Knock
   mattr_accessor :token_public_key
   self.token_public_key = nil
 
+  mattr_accessor :default_client
+  self.default_client = 0
+
   mattr_accessor :not_found_exception_class_name
   self.not_found_exception_class_name = 'ActiveRecord::RecordNotFound'
 
